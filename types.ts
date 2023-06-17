@@ -1,4 +1,4 @@
-import { ConsumerConfig, IHeaders } from "kafkajs";
+import { ConsumerConfig, IHeaders, InstrumentationEvent } from "kafkajs";
 
 export type GetConsumerMessagesParams = {
   config: ConsumerConfig;
@@ -7,7 +7,6 @@ export type GetConsumerMessagesParams = {
   offset?: string;
   recoverOffsets?: boolean;
 };
-export type GetConsumerMessagesOutput = ConsumerMessageOutput | ConsumerEventOutput;
 export type ConsumerMessageOutput = {
   type: 'message';
   headers: IHeaders;
@@ -15,6 +14,6 @@ export type ConsumerMessageOutput = {
   workComplete: () => Promise<void>;
 };
 export type ConsumerEventOutput = {
-  type: 'event';
-  body: string;
-};
+  event: string;
+  payload?: InstrumentationEvent<any>;
+}

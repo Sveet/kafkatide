@@ -3,6 +3,7 @@ import {
   AdminConfig,
   CompressionTypes,
   ConsumerConfig,
+  InstrumentationEvent,
   Kafka,
   KafkaConfig,
   Message,
@@ -10,7 +11,7 @@ import {
   ProducerConfig,
 } from 'kafkajs';
 import { asyncScheduler, Observable, observeOn, Subscriber } from 'rxjs';
-import { GetConsumerMessagesOutput, GetConsumerMessagesParams } from './types';
+import { ConsumerEventOutput, ConsumerMessageOutput, GetConsumerMessagesParams } from './types';
 
 export default class KafkaTide {
   private kafka: Kafka;
@@ -20,13 +21,6 @@ export default class KafkaTide {
 
   private getConsumer(config: ConsumerConfig) {
     return this.kafka.consumer(config);
-  }
-  private _admin?: Admin;
-  private getAdmin(config?: AdminConfig) {
-    if (!this._admin) {
-      this._admin = this.kafka.admin(config);
-    }
-    return this._admin;
   }
 
   private _producer?: Producer;
@@ -66,17 +60,16 @@ export default class KafkaTide {
     }
   }
 
-  streamFromTopic = ({
+  consume = ({
     config,
     topic,
     partition,
     offset,
-    recoverOffsets,
   }: GetConsumerMessagesParams) => {
     const { startWorkingOffset, finishWorkingOffset } = this.getOffsetHandlers();
 
     const consumer = this.getConsumer({ ...config, maxInFlightRequests: 20 });
-    const run = async (subscriber: Subscriber<GetConsumerMessagesOutput>) => {
+    const run = async (subscriber: Subscriber<ConsumerMessageOutput>) => {
       await consumer.connect();
       await consumer.subscribe({ topic, fromBeginning: false });
 
@@ -122,35 +115,14 @@ export default class KafkaTide {
 
       if (partition !== undefined && offset !== undefined) {
         let offsetToSeek = offset.toString();
-        let recoveredOffset = false;
-        if (recoverOffsets) {
-          try {
-            // Try and fetch the existing offsets for this consumerGroup
-            const workerPartitionOffsets = await this.getAdmin().fetchOffsets({
-              groupId: config.groupId,
-              topics: [topic],
-            });
-
-            const committedOffset = workerPartitionOffsets
-              ?.find((t) => t.topic == topic)
-              ?.partitions?.find((p) => p.partition == partition)?.offset;
-
-            recoveredOffset = parseInt(committedOffset) > 0;
-            if (recoveredOffset) {
-              offsetToSeek = committedOffset;
-            }
-          } catch (err) {
-            console.warn(`Error trying to recover offsets for ${config.groupId} ${topic} ${err}`);
-          }
-        }
         console.log(
-          `handleInputData ${config.groupId}: Seeking offset: ${offsetToSeek}, partition: ${partition}, recovered: ${recoveredOffset}`,
+          `handleInputData ${config.groupId}: Seeking offset: ${offsetToSeek}, partition: ${partition}`,
         );
         consumer.seek({ topic, partition, offset: offsetToSeek });
       }
     };
 
-    const restartConsumer = async (subscriber: Subscriber<GetConsumerMessagesOutput>) => {
+    const restartConsumer = async (subscriber: Subscriber<ConsumerMessageOutput>) => {
       try {
         await consumer.disconnect();
         await run(subscriber);
@@ -158,23 +130,16 @@ export default class KafkaTide {
         console.error(`Failed to restart consumer ${config.groupId}: ${err}`);
       }
     };
-    return new Observable<GetConsumerMessagesOutput>((subscriber) => {
+    const message$ = new Observable<ConsumerMessageOutput>((subscriber) => {
       consumer.on('consumer.crash', (e) => {
         const eventString = `${typeof e.payload.error} ${e.payload.error} ${e.payload.error.stack}`;
         if (e.payload.restart) {
-          // rebalancing sometimes runs out of internal retries and requires consumer restart
+          // rebalancing sometimes runs out of internal retries and requires a consumer restart
           console.error(`Consumer ${config.groupId} received a non-retriable error: ${eventString}`);
           return restartConsumer(subscriber);
         } else {
           console.warn(`KafkaJS retriable error for ${config.groupId}: ${eventString}`);
         }
-      });
-      consumer.on('consumer.rebalancing', (e) => {
-        console.warn(`Consumer ${config.groupId} is rebalancing.`);
-        subscriber.next({
-          type: 'event',
-          body: 'rebalancing',
-        });
       });
       run(subscriber).catch((err) => {
         console.error(`KafkaJS consumer.run threw error ${err}`);
@@ -189,6 +154,17 @@ export default class KafkaTide {
           .catch((err) => console.error(`Error disconnecting consumer ${config.groupId} ${err}`));
       };
     }).pipe(observeOn(asyncScheduler));
+    const event$ = new Observable<ConsumerEventOutput>((subscriber) => {
+      for(const event of Object.values(consumer.events)){
+        consumer.on(event, (e)=>{
+          subscriber.next({
+            event,
+            payload: e
+          })
+        })
+      }
+    })
+    return { message$, event$ }
   };
 
   private getOffsetHandlers() {
@@ -248,15 +224,5 @@ export default class KafkaTide {
       return undefined;
     };
     return { startWorkingOffset, finishWorkingOffset };
-  }
-
-  async deleteConsumerGroups(consumerGroupIds: string[]) {
-    if (!(consumerGroupIds?.length > 0)) return;
-    try {
-      await this.getAdmin().deleteGroups(consumerGroupIds);
-      console.log(`Deleted consumer groups: [${consumerGroupIds.join(',')}]`);
-    } catch (err) {
-      console.warn(`Error deleting consumer groups [${consumerGroupIds.join(',')}]: ${err}`);
-    }
   }
 }
