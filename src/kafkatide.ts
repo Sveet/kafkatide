@@ -12,7 +12,7 @@ import {
 import { asyncScheduler, buffer, bufferTime, concatMap, from, merge, mergeWith, Observable, observeOn, scheduled, share, Subject, Subscriber, take, takeUntil } from 'rxjs';
 import { EventOutput, ConsumerMessageOutput, ConsumeParams } from './types';
 import { getOffsetHandlers } from './offsets';
-import { waitFor } from '../operators';
+import { waitFor } from './operators';
 
 export default class KafkaTide {
   private kafka: Kafka;

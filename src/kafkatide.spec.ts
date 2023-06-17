@@ -1,3 +1,4 @@
+import { count, delay, of, take, takeUntil } from 'rxjs';
 import KafkaTide from './kafkatide';
 import { CompressionTypes, Kafka, Message, logLevel } from 'kafkajs';
 jest.mock('kafkajs');
@@ -21,12 +22,12 @@ let mockKafka: {
 const resetMocks = () => {
   mockProducer = {
     connect: jest.fn().mockImplementationOnce(async () => await new Promise(resolve => setTimeout(resolve, 100))),
-    disconnect: jest.fn().mockImplementationOnce(async () => await new Promise(resolve => setTimeout(resolve, 100))),
+    disconnect: jest.fn(),
     send: jest.fn(),
   };
   mockConsumer = {
     connect: jest.fn().mockImplementationOnce(async () => await new Promise(resolve => setTimeout(resolve, 100))),
-    disconnect: jest.fn().mockImplementationOnce(async () => await new Promise(resolve => setTimeout(resolve, 100))),
+    disconnect: jest.fn(),
     subscribe: jest.fn(),
     run: jest.fn(),
     on: jest.fn(),
@@ -83,6 +84,15 @@ describe('KafkaTide', () => {
   });
 
   describe('consume', () => {
+    beforeEach(() => {
+      resetMocks();
+      mockConsumer.run.mockImplementationOnce(async ({eachMessage})=>{
+        for(const m of messages){
+          await eachMessage({ message: m, partition: 1, heartbeat: jest.fn() })
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      })
+    })
     it('should request a consumer with options', () => {
       const consumeOptions = {
         topic: 'demo-topic',
@@ -93,5 +103,24 @@ describe('KafkaTide', () => {
       const { message$, event$ } = tide.consume(consumeOptions);
       expect(mockKafka.consumer).toHaveBeenCalledWith(consumeOptions.config);
     });
+
+    it('should return a message from the topic', async () => {
+      const consumeOptions = {
+        topic: 'demo-topic',
+        config: {
+          groupId: 'demo-consumer'
+        },
+      };
+      const { message$, event$ } = tide.consume(consumeOptions);
+      let i = 0
+      message$.pipe(
+        takeUntil(of([true]).pipe(delay(1000))),
+      ).subscribe({
+        next:(message) => {
+          expect(message).toBe(messages[i++])
+        },
+      })
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    })
   });
 });
