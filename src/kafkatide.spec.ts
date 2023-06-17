@@ -17,7 +17,7 @@ let mockConsumer: {
 let mockKafka: {
   producer: jest.Mock,
   consumer: jest.Mock,
-}
+};
 const resetMocks = () => {
   mockProducer = {
     connect: jest.fn().mockImplementationOnce(async () => await new Promise(resolve => setTimeout(resolve, 100))),
@@ -36,7 +36,7 @@ const resetMocks = () => {
     consumer: jest.fn().mockReturnValue(mockConsumer),
   };
   (Kafka as any).mockReturnValue(mockKafka);
-}
+};
 
 describe('KafkaTide', () => {
   let tide: KafkaTide;
@@ -53,11 +53,11 @@ describe('KafkaTide', () => {
       const produceOptions = {
         allowAutoTopicCreation: false,
         transactionTimeout: 1000
-      }
+      };
       const { sendSubject } = tide.produce('demo-topic', produceOptions);
       expect(mockKafka.producer).toHaveBeenCalledWith(produceOptions);
-    })
-  })
+    });
+  });
 
   describe('consume', () => {
     it('should request a consumer with options', () => {
@@ -66,9 +66,9 @@ describe('KafkaTide', () => {
         config: {
           groupId: 'demo-consumer'
         },
-      }
+      };
       const { message$, event$ } = tide.consume(consumeOptions);
       expect(mockKafka.consumer).toHaveBeenCalledWith(consumeOptions.config);
-    })
-  })
+    });
+  });
 });

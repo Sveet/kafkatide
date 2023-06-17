@@ -48,7 +48,7 @@ export default class KafkaTide {
           throw err;
         }
       }
-    }
+    };
     const sendComplete$ = new Subject<void>();
     const sendSubject = new Subject<ProducerRecord>();
     const event$ = new Observable<EventOutput>((subscriber) => {
@@ -57,10 +57,10 @@ export default class KafkaTide {
           subscriber.next({
             event,
             payload: e
-          })
-        })
+          });
+        });
       }
-    })
+    });
     from(producer.connect()).pipe(
       concatMap(() => sendSubject),
       buffer(sendComplete$),
@@ -69,11 +69,11 @@ export default class KafkaTide {
         if(records.length <= 0) return;
 
         return send(topic, records.reduce((acc, rec) => [...acc, ...rec.messages], []))
-          .then(() => sendComplete$.next())
+          .then(() => sendComplete$.next());
       },
-    })
-    return { sendSubject, event$ }
-  }
+    });
+    return { sendSubject, event$ };
+  };
 
   consume = ({
     config,
@@ -117,7 +117,7 @@ export default class KafkaTide {
                   subscriber.error(err);
                 }
               }
-            })
+            });
             subscriber.next({
               type: 'message',
               headers,
@@ -131,7 +131,7 @@ export default class KafkaTide {
       });
 
       if (partition !== undefined && offset !== undefined) {
-        let offsetToSeek = offset.toString();
+        const offsetToSeek = offset.toString();
         console.log(
           `handleInputData ${config.groupId}: Seeking offset: ${offsetToSeek}, partition: ${partition}`,
         );
@@ -177,10 +177,10 @@ export default class KafkaTide {
           subscriber.next({
             event,
             payload: e
-          })
-        })
+          });
+        });
       }
-    })
-    return { message$, event$ }
+    });
+    return { message$, event$ };
   };
 }

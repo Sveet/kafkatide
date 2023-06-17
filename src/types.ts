@@ -1,5 +1,5 @@
-import { ConsumerConfig, IHeaders, InstrumentationEvent } from "kafkajs";
-import { Subject } from "rxjs";
+import { ConsumerConfig, IHeaders, InstrumentationEvent } from 'kafkajs';
+import { Subject } from 'rxjs';
 
 export type ConsumeParams = {
   config: ConsumerConfig;
