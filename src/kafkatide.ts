@@ -33,6 +33,15 @@ export default class KafkaTide {
     this.kafka = new Kafka(kafkaConfig);
   }
 
+  /**
+   * @param topic - Kafka topic to produce to
+   * @param producerConfig - Optional KafkaJS producer config
+   * @returns Object containing:
+   *  - sendSubject: RxJS Subject to send messages to Kafka
+   *  - event$: Observable of KafkaJS producer events
+   *  - error$: Observable of KafkaJS producer errors
+   *  - disconnectSubject: RxJS Subject to disconnect the producer
+   */
   produce = (topic: string, producerConfig?: ProducerConfig) => {
     let producer = this.kafka.producer(producerConfig);
     const send = async (
@@ -100,6 +109,15 @@ export default class KafkaTide {
     return { sendSubject, event$, error$, disconnectSubject };
   };
 
+  /**
+   * @param config - KafkaJS consumer config
+   * @param topic - Kafka topic to consume from
+   * @param partition - Optional partition to consume from
+   * @param offset - Optional offset to start consuming from
+   * @returns Object containing:
+   *  - message$: Observable of consumed Kafka messages
+   *  - event$: Observable of KafkaJS consumer events
+   */
   consume = ({ config, topic, partition, offset }: ConsumeParams) => {
     const { startWorkingOffset, finishWorkingOffset } = getOffsetHandlers();
     const consumer = this.kafka.consumer(config);
