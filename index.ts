@@ -1,2 +1,2 @@
-export * from './kafkatide'
-export * from './types'
+export * from './src/kafkatide'
+export * from './src/types'
