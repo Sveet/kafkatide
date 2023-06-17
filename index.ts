@@ -1,17 +1,15 @@
 import {
-  Admin,
-  AdminConfig,
   CompressionTypes,
   ConsumerConfig,
-  InstrumentationEvent,
   Kafka,
   KafkaConfig,
   Message,
-  Producer,
   ProducerConfig,
+  ProducerRecord,
+  RecordMetadata,
 } from 'kafkajs';
-import { asyncScheduler, Observable, observeOn, Subscriber } from 'rxjs';
-import { ConsumerEventOutput, ConsumerMessageOutput, GetConsumerMessagesParams } from './types';
+import { asyncScheduler, buffer, concatMap, firstValueFrom, from, mergeMap, Observable, observeOn, Subject, Subscriber } from 'rxjs';
+import { EventOutput, ConsumerMessageOutput, ConsumeParams } from './types';
 
 export default class KafkaTide {
   private kafka: Kafka;
@@ -23,41 +21,57 @@ export default class KafkaTide {
     return this.kafka.consumer(config);
   }
 
-  private _producer?: Producer;
-  private _producerConnecting = false;
-  private async getProducer(config?: ProducerConfig) {
-    if (!this._producer) {
-      this._producerConnecting = true;
-      this._producer = this.kafka.producer(config);
-      await this._producer.connect();
-      this._producerConnecting = false;
-    }
-    while (this._producerConnecting) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    return this._producer;
+  private getProducer(config?: ProducerConfig) {
+    return this.kafka.producer(config);
   }
 
-  async send(topic: string, messages: Message[], retries = 1) {
-    const producer = await this.getProducer();
-    try {
-      const response = await producer.send({
-        topic: topic,
-        messages: messages,
-        compression: CompressionTypes.GZIP,
-      });
-      return response;
-    } catch (err: any) {
-      if (retries > 0 && `${err}`.includes('The producer is disconnected')) {
-        console.warn(
-          `Sending KafkaJS messages failed because Producer was disconnected. Reconnecting (${retries}) and retrying to send.`,
-        );
-        this._producer = undefined;
-        return this.send(topic, messages, retries - 1);
-      } else {
-        throw err;
+  produce = (topic: string, producerConfig?: ProducerConfig) => {
+    let producer = this.getProducer(producerConfig);
+    const send = async (topic: string, messages: Message[], retries = 1): Promise<RecordMetadata[]> => {
+      try {
+        const response = await producer.send({
+          topic: topic,
+          messages: messages,
+          compression: CompressionTypes.GZIP,
+        });
+        return response;
+      } catch (err: any) {
+        if (retries > 0 && `${err}`.includes('The producer is disconnected')) {
+          console.warn(
+            `Sending KafkaJS messages failed because Producer was disconnected. Reconnecting (${retries}) and retrying to send.`,
+          );
+          producer = this.getProducer(producerConfig);
+          await producer.connect();
+          return send(topic, messages, retries - 1);
+        } else {
+          throw err;
+        }
       }
     }
+    const sendComplete$ = new Subject<void>();
+    const sendSubject = new Subject<ProducerRecord>();
+    const event$ = new Observable<EventOutput>((subscriber) => {
+      for(const event of Object.values(producer.events)){
+        producer.on(event, (e)=>{
+          subscriber.next({
+            event,
+            payload: e
+          })
+        })
+      }
+    })
+    from(producer.connect()).pipe(
+      concatMap(() => sendSubject),
+      buffer(sendComplete$),
+    ).subscribe({
+      next: (records) => {
+        if(records.length <= 0) return;
+
+        return send(topic, records.reduce((acc, rec) => [...acc, ...rec.messages], []))
+          .then(() => sendComplete$.next())
+      },
+    })
+    return { sendSubject, event$ }
   }
 
   consume = ({
@@ -65,7 +79,7 @@ export default class KafkaTide {
     topic,
     partition,
     offset,
-  }: GetConsumerMessagesParams) => {
+  }: ConsumeParams) => {
     const { startWorkingOffset, finishWorkingOffset } = this.getOffsetHandlers();
 
     const consumer = this.getConsumer({ ...config, maxInFlightRequests: 20 });
@@ -154,7 +168,7 @@ export default class KafkaTide {
           .catch((err) => console.error(`Error disconnecting consumer ${config.groupId} ${err}`));
       };
     }).pipe(observeOn(asyncScheduler));
-    const event$ = new Observable<ConsumerEventOutput>((subscriber) => {
+    const event$ = new Observable<EventOutput>((subscriber) => {
       for(const event of Object.values(consumer.events)){
         consumer.on(event, (e)=>{
           subscriber.next({

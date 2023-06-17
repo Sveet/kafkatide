@@ -1,6 +1,6 @@
 import { ConsumerConfig, IHeaders, InstrumentationEvent } from "kafkajs";
 
-export type GetConsumerMessagesParams = {
+export type ConsumeParams = {
   config: ConsumerConfig;
   topic: string;
   partition?: number;
@@ -13,7 +13,7 @@ export type ConsumerMessageOutput = {
   body: string;
   workComplete: () => Promise<void>;
 };
-export type ConsumerEventOutput = {
+export type EventOutput = {
   event: string;
   payload?: InstrumentationEvent<any>;
 }
