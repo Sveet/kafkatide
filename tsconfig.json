@@ -1,4 +1,5 @@
 {
+  "exclude": ["./dist/**/*", "./example/**/*"],
   "compilerOptions": {
     "module": "commonjs",
     "declaration": true,

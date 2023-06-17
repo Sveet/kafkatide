@@ -1,4 +1,4 @@
-import { of } from "rxjs";
+import { from } from "rxjs";
 import KafkaTide from "../dist/src/kafkatide";
 
 const brokers = (process.env.KAFKA_BROKERS ?? 'localhost:29092').split(';')
@@ -20,7 +20,7 @@ message$.subscribe({
 setTimeout(()=> {
   // produce messages
   const { sendSubject } = produce(topic)
-  of('sample 1', 'sample 2', 'sample 3').subscribe({
+  from(['sample 1', 'sample 2', 'sample 3']).subscribe({
     next: (m) => {
       console.log(`sending: ${m}`)
       sendSubject.next({ value: m })
