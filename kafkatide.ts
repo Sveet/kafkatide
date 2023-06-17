@@ -8,7 +8,7 @@ import {
   ProducerRecord,
   RecordMetadata,
 } from 'kafkajs';
-import { asyncScheduler, buffer, concatMap, firstValueFrom, from, mergeMap, Observable, observeOn, Subject, Subscriber } from 'rxjs';
+import { asyncScheduler, buffer, concatMap, from, Observable, observeOn, Subject, Subscriber } from 'rxjs';
 import { EventOutput, ConsumerMessageOutput, ConsumeParams } from './types';
 import { getOffsetHandlers } from './offsets';
 
@@ -98,29 +98,31 @@ export default class KafkaTide {
             await heartbeat();
             startWorkingOffset(partition, Number.parseInt(message.offset));
 
+            const workComplete = new Subject<void>();
+            workComplete.subscribe(() => {
+              const dataToCommit = finishWorkingOffset(
+                partition,
+                Number.parseInt(message.offset),
+              );
+              if (dataToCommit?.offset) {
+                try {
+                  return consumer.commitOffsets([
+                    {
+                      topic,
+                      partition,
+                      offset: `${dataToCommit.offset + 1}`,
+                    },
+                  ]);
+                } catch (err) {
+                  subscriber.error(err);
+                }
+              }
+            })
             subscriber.next({
               type: 'message',
               headers,
               body,
-              workComplete: async () => {
-                const dataToCommit = finishWorkingOffset(
-                  partition,
-                  Number.parseInt(message.offset),
-                );
-                if (dataToCommit?.offset) {
-                  try {
-                    await consumer.commitOffsets([
-                      {
-                        topic,
-                        partition,
-                        offset: `${dataToCommit.offset + 1}`,
-                      },
-                    ]);
-                  } catch (err) {
-                    subscriber.error(err);
-                  }
-                }
-              },
+              workComplete,
             });
           } catch (err) {
             subscriber.error(err);
