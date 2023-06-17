@@ -1,4 +1,4 @@
-import { ConsumerConfig, IHeaders, InstrumentationEvent } from 'kafkajs';
+import { ConsumerConfig, ConsumerRunConfig, IHeaders, InstrumentationEvent } from 'kafkajs';
 import { Subject } from 'rxjs';
 
 export type ConsumeParams = {
@@ -7,7 +7,7 @@ export type ConsumeParams = {
   partition?: number;
   offset?: string;
   recoverOffsets?: boolean;
-  autoCommit?: boolean;
+  runConfig?: RunConfig;
 };
 export type Message = {
   partition: number;
@@ -20,3 +20,7 @@ export type Event = {
   type: string;
   payload?: InstrumentationEvent<any>;
 };
+export type RunConfig = Pick<
+  ConsumerRunConfig,
+  'autoCommit' | 'autoCommitInterval' | 'autoCommitThreshold' | 'partitionsConsumedConcurrently'
+>;
