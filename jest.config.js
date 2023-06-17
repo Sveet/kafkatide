@@ -9,9 +9,15 @@ const config = {
   "transform": {
     "^.+\\.(t|j)s$": "ts-jest"
   },
+  "collectCoverage": true,
   "collectCoverageFrom": [
-    "**/*.(t|j)s"
+    "./src/**/*.(t|j)s"
   ],
+  "coverageThreshold": {
+    "global": {
+      "lines": 90
+    }
+  },
   "coverageDirectory": "./coverage",
   "testEnvironment": "node",
 }

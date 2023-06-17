@@ -1,4 +1,3 @@
-import { count, delay, of, take, takeUntil } from 'rxjs';
 import KafkaTide from './kafkatide';
 import { CompressionTypes, Kafka, Message, logLevel } from 'kafkajs';
 jest.mock('kafkajs');
@@ -15,6 +14,7 @@ const mockConsumer = {
   seek: jest.fn(),
   run: jest.fn(),
   on: jest.fn(),
+  commitOffsets: jest.fn(),
 };
 const mockKafka = {
   producer: jest.fn().mockReturnValue(mockProducer),
@@ -58,12 +58,27 @@ describe('KafkaTide', () => {
       disconnectSubject.next();
     });
 
-    it('calls producer.send sendSubject.next(messages) is called', async () => {
+    it('should call producer.send when sendSubject is triggered', async () => {
       const { sendSubject, disconnectSubject } = tide.produce(topic);
       sendSubject.next(messages);
       await new Promise(resolve => setTimeout(resolve, 500));
       expect(mockProducer.send).toHaveBeenCalledWith({topic, messages, compression: CompressionTypes.GZIP});
       disconnectSubject.next();
+    });
+
+    it('should retry sending if a disconnect error occurs', async () => {
+      const { sendSubject, disconnectSubject } = tide.produce(topic);
+      mockProducer.send.mockImplementationOnce(()=>{throw new Error('The producer is disconnected');});
+      sendSubject.next(messages);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      expect(mockProducer.send).toHaveBeenCalledTimes(2);
+      disconnectSubject.next();
+    });
+
+    it('should call producer.disconnect when disconnectSubject is triggered', () => {
+      const { sendSubject, disconnectSubject } = tide.produce(topic);
+      disconnectSubject.next();
+      expect(mockProducer.disconnect).toHaveBeenCalled();
     });
 
   });
@@ -72,8 +87,9 @@ describe('KafkaTide', () => {
     beforeEach(() => {
       jest.clearAllMocks();
       mockConsumer.run.mockImplementationOnce(async ({eachMessage})=>{
-        for(const m of messages){
-          await eachMessage({ message: m, partition: 1, heartbeat: jest.fn() });
+        for(let i = 0; i < messages.length; i++){
+          const m = messages[i];
+          await eachMessage({ message: {...m, offset: i}, partition: 1, heartbeat: jest.fn() });
           await new Promise(resolve => setTimeout(resolve, 100));
         }
       });
@@ -89,11 +105,12 @@ describe('KafkaTide', () => {
       expect(mockKafka.consumer).toHaveBeenCalledWith(consumeOptions.config);
     });
 
-    it('should subscribe to the given topic', () => {
+    it('should subscribe to the given topic', async () => {
       const { message$ } = tide.consume({topic, config: { groupId }});
       message$.subscribe(() => {
         expect(mockConsumer.subscribe).toHaveBeenCalledWith({ topic, fromBeginning: false });
       });
+      await new Promise(resolve => setTimeout(resolve, 500));
     });
 
     it('should seek to the given partition and offset if provided', async () => {
@@ -115,9 +132,10 @@ describe('KafkaTide', () => {
       let i = 0;
       message$.subscribe({
         next:(message) => {
-          expect(message).toBe(messages[i++]);
+          expect(message.value).toBe(messages[i++].value);
         },
       });
+      await new Promise(resolve => setTimeout(resolve, 500));
     });
 
     it('should disconnect when the observable is unsubscribed', async () => {
@@ -134,6 +152,43 @@ describe('KafkaTide', () => {
       });
       subscription.unsubscribe();
       expect(mockConsumer.disconnect).toHaveBeenCalled();
+    });
+
+    it('should call consumer.commitOffsets when appropriate', async () => {
+      const consumeOptions = {
+        topic,
+        config: {
+          groupId
+        },
+      };
+      const { message$ } = tide.consume(consumeOptions);
+      message$.subscribe({
+        next:(message) => {
+          message.workComplete.next();
+        },
+      });
+      await new Promise(resolve => setTimeout(resolve, 500));
+      expect(mockConsumer.commitOffsets).toHaveBeenCalled();
+    });
+    it('should call subscriber.error if consumer.commitOffsets throws an error', async () => {
+      const errorMessage = 'mocked error';
+      mockConsumer.commitOffsets.mockImplementationOnce(() => {throw new Error(errorMessage);});
+      const consumeOptions = {
+        topic,
+        config: {
+          groupId
+        },
+      };
+      const { message$ } = tide.consume(consumeOptions);
+      message$.subscribe({
+        next:(message) => {
+          message.workComplete.next();
+        },
+        error: (err) => {
+          expect(err.message).toBe(errorMessage);
+        }
+      });
+      await new Promise(resolve => setTimeout(resolve, 500));
     });
   });
 });
