@@ -119,7 +119,7 @@ export default class KafkaTide {
    *  - event$: Observable of KafkaJS consumer events
    */
   consume = ({ autoCommit, config, topic, partition, offset }: ConsumeParams) => {
-    autoCommit ??= true
+    autoCommit ??= true;
     const { startWorkingOffset, finishWorkingOffset } = getOffsetHandlers();
     const consumer = this.kafka.consumer(config);
     const run = async (subscriber: Subscriber<Message>) => {
@@ -135,7 +135,7 @@ export default class KafkaTide {
             const workComplete = new Subject<void>();
 
             await heartbeat();
-            if(!autoCommit){
+            if (!autoCommit) {
               startWorkingOffset(partition, Number.parseInt(message.offset));
               workComplete.subscribe(() => {
                 const offsetToCommit = finishWorkingOffset(
