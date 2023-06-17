@@ -1,0 +1,19 @@
+{
+  "name": "kafkatide",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Joseph Fortman",
+  "license": "MIT",
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.3"
+  }
+}
