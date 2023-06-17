@@ -8,13 +8,14 @@ export type ConsumeParams = {
   offset?: string;
   recoverOffsets?: boolean;
 };
-export type ConsumerMessageOutput = {
-  type: 'message';
+export type Message = {
+  partition: number;
+  offset: string;
   headers: IHeaders;
-  body: string;
+  value: string;
   workComplete: Subject<void>;
 };
-export type EventOutput = {
-  event: string;
+export type Event = {
+  type: string;
   payload?: InstrumentationEvent<any>;
 }

@@ -1,16 +1,14 @@
 import {
   CompressionTypes,
-  ConsumerConfig,
   Kafka,
   KafkaConfig,
-  Message,
+  Message as KafkaMessage,
   ProducerConfig,
-  ProducerRecord,
   RecordMetadata,
   logLevel,
 } from 'kafkajs';
-import { asyncScheduler, buffer, bufferTime, concatMap, from, merge, mergeWith, Observable, observeOn, scheduled, share, Subject, Subscriber, take, takeUntil } from 'rxjs';
-import { EventOutput, ConsumerMessageOutput, ConsumeParams } from './types';
+import { asyncScheduler, buffer, bufferTime, from, mergeWith, Observable, observeOn, scheduled, share, Subject, Subscriber, take, takeUntil } from 'rxjs';
+import { Event, Message, ConsumeParams } from './types';
 import { getOffsetHandlers } from './offsets';
 import { waitFor } from './operators';
 
@@ -23,7 +21,7 @@ export default class KafkaTide {
 
   produce = (topic: string, producerConfig?: ProducerConfig) => {
     let producer = this.kafka.producer(producerConfig);
-    const send = async (topic: string, messages: Message[], retries = 1): Promise<RecordMetadata[]> => {
+    const send = async (topic: string, messages: KafkaMessage[], retries = 1): Promise<RecordMetadata[]> => {
       try {
         const response = await producer.send({
           topic: topic,
@@ -46,15 +44,15 @@ export default class KafkaTide {
     };
     const connect$ = from(producer.connect()).pipe(share());
     const disconnectSubject = new Subject<void>();
-    const sendSubject = new Subject<Message[]>();
+    const sendSubject = new Subject<KafkaMessage[]>();
     const send$ = sendSubject.asObservable().pipe(share());
     const errorSubject = new Subject<Error>();
     const error$ = errorSubject.asObservable();
-    const event$ = new Observable<EventOutput>((subscriber) => {
+    const event$ = new Observable<Event>((subscriber) => {
       for(const event of Object.values(producer.events)){
         producer.on(event, (e)=>{
           subscriber.next({
-            event,
+            type: event,
             payload: e
           });
         });
@@ -94,7 +92,7 @@ export default class KafkaTide {
   consume = ({ config, topic, partition, offset }: ConsumeParams) => {
     const { startWorkingOffset, finishWorkingOffset } = getOffsetHandlers();
     const consumer = this.kafka.consumer(config);
-    const run = async (subscriber: Subscriber<ConsumerMessageOutput>) => {
+    const run = async (subscriber: Subscriber<Message>) => {
       await consumer.connect();
       await consumer.subscribe({ topic, fromBeginning: false });
 
@@ -103,7 +101,7 @@ export default class KafkaTide {
         eachMessage: async ({ message, partition, heartbeat }) => {
           try {
             const headers = message.headers;
-            const body = message.value.toString();
+            const value = message.value.toString();
 
             await heartbeat();
             startWorkingOffset(partition, Number.parseInt(message.offset));
@@ -129,9 +127,10 @@ export default class KafkaTide {
               }
             });
             subscriber.next({
-              type: 'message',
+              partition,
+              offset: message.offset,
               headers,
-              body,
+              value,
               workComplete,
             });
           } catch (err) {
@@ -141,13 +140,12 @@ export default class KafkaTide {
       });
 
       if (partition !== undefined && offset !== undefined) {
-        const offsetToSeek = offset.toString();
-        console.debug(`${config.groupId} seeking offset: ${offsetToSeek}, partition: ${partition}`);
-        consumer.seek({ topic, partition, offset: offsetToSeek });
+        console.debug(`${config.groupId} seeking offset: ${offset}, partition: ${partition}`);
+        consumer.seek({ topic, partition, offset });
       }
     };
 
-    const restartConsumer = async (subscriber: Subscriber<ConsumerMessageOutput>) => {
+    const restartConsumer = async (subscriber: Subscriber<Message>) => {
       try {
         await consumer.disconnect();
         await run(subscriber);
@@ -155,7 +153,7 @@ export default class KafkaTide {
         console.error(`Failed to restart consumer ${config.groupId}: ${err}`);
       }
     };
-    const message$ = new Observable<ConsumerMessageOutput>((subscriber) => {
+    const message$ = new Observable<Message>((subscriber) => {
       consumer.on('consumer.crash', (e) => {
         const eventString = `${typeof e.payload.error} ${e.payload.error} ${e.payload.error.stack}`;
         if (e.payload.restart) {
@@ -179,11 +177,11 @@ export default class KafkaTide {
           .catch((err) => console.error(`Error disconnecting consumer ${config.groupId} ${err}`));
       };
     }).pipe(observeOn(asyncScheduler));
-    const event$ = new Observable<EventOutput>((subscriber) => {
+    const event$ = new Observable<Event>((subscriber) => {
       for(const event of Object.values(consumer.events)){
         consumer.on(event, (e)=>{
           subscriber.next({
-            event,
+            type: event,
             payload: e
           });
         });
