@@ -60,16 +60,16 @@ describe('KafkaTide', () => {
 
     it('should call producer.send when sendSubject is triggered', async () => {
       const { sendSubject, disconnectSubject } = tide.produce(topic);
-      sendSubject.next(messages);
+      sendSubject.next(messages[0]);
       await new Promise(resolve => setTimeout(resolve, 500));
-      expect(mockProducer.send).toHaveBeenCalledWith({topic, messages, compression: CompressionTypes.GZIP});
+      expect(mockProducer.send).toHaveBeenCalledWith({topic, messages: [messages[0]], compression: CompressionTypes.GZIP});
       disconnectSubject.next();
     });
 
     it('should retry sending if a disconnect error occurs', async () => {
       const { sendSubject, disconnectSubject } = tide.produce(topic);
       mockProducer.send.mockImplementationOnce(()=>{throw new Error('The producer is disconnected');});
-      sendSubject.next(messages);
+      sendSubject.next(messages[0]);
       await new Promise(resolve => setTimeout(resolve, 500));
       expect(mockProducer.send).toHaveBeenCalledTimes(2);
       disconnectSubject.next();

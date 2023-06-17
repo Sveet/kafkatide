@@ -44,7 +44,7 @@ export default class KafkaTide {
     };
     const connect$ = from(producer.connect()).pipe(share());
     const disconnectSubject = new Subject<void>();
-    const sendSubject = new Subject<KafkaMessage[]>();
+    const sendSubject = new Subject<KafkaMessage>();
     const send$ = sendSubject.asObservable().pipe(share());
     const errorSubject = new Subject<Error>();
     const error$ = errorSubject.asObservable();
@@ -71,7 +71,7 @@ export default class KafkaTide {
       next: async (records) => {
         if(records.length <= 0) return;
 
-        return send(topic, records.reduce((acc, cur) => [...acc, ...cur], []))
+        return send(topic, records)
           .catch(err => {
             if(`${err}`.toLowerCase().includes('disconnected')){
               sendSubject.error(err);
