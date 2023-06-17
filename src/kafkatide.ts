@@ -43,8 +43,9 @@ export default class KafkaTide {
         }
       }
     };
-    const sendComplete$ = new Subject<void>();
+    const sendCompleteSubject = new Subject<void>();
     const sendSubject = new Subject<ProducerRecord>();
+    const errorSubject = new Subject<Error>();
     const event$ = new Observable<EventOutput>((subscriber) => {
       for(const event of Object.values(producer.events)){
         producer.on(event, (e)=>{
@@ -57,16 +58,18 @@ export default class KafkaTide {
     });
     from(producer.connect()).pipe(
       concatMap(() => sendSubject),
-      buffer(sendComplete$),
+      buffer(sendCompleteSubject),
     ).subscribe({
       next: (records) => {
-        if(records.length <= 0) return;
+        if(records.length <= 0) return sendCompleteSubject.next();
 
         return send(topic, records.reduce((acc, rec) => [...acc, ...rec.messages], []))
-          .then(() => sendComplete$.next());
+          .then(() => sendCompleteSubject.next())
+          .catch(err => errorSubject.next(err));
       },
     });
-    return { sendSubject, event$ };
+    const error$ = errorSubject.asObservable();
+    return { sendSubject, event$, error$ };
   };
 
   consume = ({ config, topic, partition, offset }: ConsumeParams) => {
