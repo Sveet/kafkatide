@@ -18,16 +18,8 @@ export default class KafkaTide {
     this.kafka = new Kafka(kafkaConfig);
   }
 
-  private getConsumer(config: ConsumerConfig) {
-    return this.kafka.consumer(config);
-  }
-
-  private getProducer(config?: ProducerConfig) {
-    return this.kafka.producer(config);
-  }
-
   produce = (topic: string, producerConfig?: ProducerConfig) => {
-    let producer = this.getProducer(producerConfig);
+    let producer = this.kafka.producer(producerConfig);
     const send = async (topic: string, messages: Message[], retries = 1): Promise<RecordMetadata[]> => {
       try {
         const response = await producer.send({
@@ -41,7 +33,7 @@ export default class KafkaTide {
           console.warn(
             `Sending KafkaJS messages failed because Producer was disconnected. Reconnecting (${retries}) and retrying to send.`,
           );
-          producer = this.getProducer(producerConfig);
+          producer = this.kafka.producer(producerConfig);
           await producer.connect();
           return send(topic, messages, retries - 1);
         } else {
@@ -82,8 +74,7 @@ export default class KafkaTide {
     offset,
   }: ConsumeParams) => {
     const { startWorkingOffset, finishWorkingOffset } = getOffsetHandlers();
-
-    const consumer = this.getConsumer(config);
+    const consumer = this.kafka.consumer(config);
     const run = async (subscriber: Subscriber<ConsumerMessageOutput>) => {
       await consumer.connect();
       await consumer.subscribe({ topic, fromBeginning: false });
