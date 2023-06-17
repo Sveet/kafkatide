@@ -1,5 +1,5 @@
 import KafkaTide from './kafkatide';
-import { Kafka } from 'kafkajs';
+import { Kafka, logLevel } from 'kafkajs';
 jest.mock('kafkajs');
 
 let mockProducer: {
@@ -35,7 +35,7 @@ const resetMocks = () => {
     producer: jest.fn().mockReturnValue(mockProducer),
     consumer: jest.fn().mockReturnValue(mockConsumer),
   };
-  (Kafka as any).mockReturnValue(mockKafka);
+  (Kafka as jest.Mock).mockReturnValue(mockKafka);
 };
 
 describe('KafkaTide', () => {
@@ -45,6 +45,13 @@ describe('KafkaTide', () => {
     resetMocks();
     tide = new KafkaTide({
       brokers: []
+    });
+  });
+
+  it('should set log level to WARN by default', ()=>{
+    expect(Kafka).toHaveBeenCalledWith({
+      brokers: [],
+      logLevel: logLevel.WARN
     });
   });
 

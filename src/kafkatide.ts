@@ -7,6 +7,7 @@ import {
   ProducerConfig,
   ProducerRecord,
   RecordMetadata,
+  logLevel,
 } from 'kafkajs';
 import { asyncScheduler, buffer, concatMap, from, Observable, observeOn, Subject, Subscriber } from 'rxjs';
 import { EventOutput, ConsumerMessageOutput, ConsumeParams } from './types';
@@ -14,7 +15,8 @@ import { getOffsetHandlers } from './offsets';
 
 export default class KafkaTide {
   private kafka: Kafka;
-  constructor(kafkaConfig: KafkaConfig) {
+  constructor(kafkaConfig?: KafkaConfig) {
+    kafkaConfig.logLevel ??= logLevel.WARN;
     this.kafka = new Kafka(kafkaConfig);
   }
 
@@ -67,12 +69,7 @@ export default class KafkaTide {
     return { sendSubject, event$ };
   };
 
-  consume = ({
-    config,
-    topic,
-    partition,
-    offset,
-  }: ConsumeParams) => {
+  consume = ({ config, topic, partition, offset }: ConsumeParams) => {
     const { startWorkingOffset, finishWorkingOffset } = getOffsetHandlers();
     const consumer = this.kafka.consumer(config);
     const run = async (subscriber: Subscriber<ConsumerMessageOutput>) => {
@@ -123,9 +120,7 @@ export default class KafkaTide {
 
       if (partition !== undefined && offset !== undefined) {
         const offsetToSeek = offset.toString();
-        console.log(
-          `handleInputData ${config.groupId}: Seeking offset: ${offsetToSeek}, partition: ${partition}`,
-        );
+        console.debug(`${config.groupId} seeking offset: ${offsetToSeek}, partition: ${partition}`);
         consumer.seek({ topic, partition, offset: offsetToSeek });
       }
     };
