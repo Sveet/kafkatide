@@ -1,5 +1,6 @@
 import KafkaTide from './kafkatide';
-import { CompressionTypes, Kafka, Message, logLevel } from 'kafkajs';
+import { CompressionTypes, ConsumerCrashEvent, Kafka, KafkaJSNonRetriableError, Message, logLevel } from 'kafkajs';
+import { Event } from './types';
 jest.mock('kafkajs');
 
 const mockProducer = {
@@ -15,6 +16,24 @@ const mockConsumer = {
   run: jest.fn(),
   on: jest.fn(),
   commitOffsets: jest.fn(),
+  events: {
+    HEARTBEAT: 'consumer.heartbeat',
+    COMMIT_OFFSETS: 'consumer.commit_offsets',
+    GROUP_JOIN: 'consumer.group_join',
+    FETCH: 'consumer.fetch',
+    FETCH_START: 'consumer.fetch_start',
+    START_BATCH_PROCESS: 'consumer.start_batch_process',
+    END_BATCH_PROCESS: 'consumer.end_batch_process',
+    CONNECT: 'consumer.connect',
+    DISCONNECT: 'consumer.disconnect',
+    STOP: 'consumer.stop',
+    CRASH: 'consumer.crash',
+    REBALANCING: 'consumer.rebalancing',
+    RECEIVED_UNSUBSCRIBED_TOPICS: 'consumer.received_unsubscribed_topics',
+    REQUEST: 'consumer.network.request',
+    REQUEST_TIMEOUT: 'consumer.network.request_timeout',
+    REQUEST_QUEUE_SIZE: 'consumer.network.request_queue_size',
+  }
 };
 const mockKafka = {
   producer: jest.fn().mockReturnValue(mockProducer),
@@ -72,6 +91,21 @@ describe('KafkaTide', () => {
       sendSubject.next(messages[0]);
       await new Promise(resolve => setTimeout(resolve, 500));
       expect(mockProducer.send).toHaveBeenCalledTimes(2);
+      disconnectSubject.next();
+    });
+
+    it('should sendSubject.error if retrying disconnect fails', async () => {
+      const { sendSubject, disconnectSubject, error$ } = tide.produce(topic);
+      mockProducer.send
+        .mockImplementationOnce(()=>{throw new Error('The producer is disconnected');})
+        .mockImplementationOnce(()=>{throw new Error('The producer is disconnected');});
+      sendSubject.next(messages[0]);
+      let error;
+      error$.subscribe((e)=>{
+        error = e;
+      });
+      await new Promise(resolve => setTimeout(resolve, 500));
+      expect(error).toBeDefined();
       disconnectSubject.next();
     });
 
@@ -189,6 +223,67 @@ describe('KafkaTide', () => {
         }
       });
       await new Promise(resolve => setTimeout(resolve, 500));
+    });
+
+    it('should restart the consumer when a non-retriable error occurs', async () => {
+      const handlers: Array<(e:ConsumerCrashEvent)=>void> = [];
+      mockConsumer.on = jest.fn().mockImplementation((name, handler)=>{
+        if(name != 'consumer.crash') return;
+        handlers.push(handler);
+      });
+      const consumeOptions = {
+        topic,
+        config: {
+          groupId
+        },
+      };
+      const { message$ } = tide.consume(consumeOptions);
+      message$.subscribe();
+      const crashEvent: ConsumerCrashEvent = {
+        type: 'crash',
+        id: '1234',
+        timestamp: Date.now(),
+        payload: {
+          error: new KafkaJSNonRetriableError('test'),
+          groupId, restart: true
+        }
+      };
+      handlers.forEach(h => h(crashEvent));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      expect(mockConsumer.disconnect).toHaveBeenCalled();
+      expect(mockConsumer.run).toHaveBeenCalledTimes(2);
+
+      mockConsumer.on = jest.fn();
+    });
+
+    it('should emit consumer events on event$', async () => {
+      const handlers: Array<(e:ConsumerCrashEvent)=>void> = [];
+      mockConsumer.on = jest.fn().mockImplementation((name, handler)=>{
+        handlers.push(handler);
+      });
+      const consumeOptions = {
+        topic,
+        config: {
+          groupId
+        },
+      };
+      const { event$ } = tide.consume(consumeOptions);
+      let event;
+      event$.subscribe((e) => event = e);
+      const crashEvent: ConsumerCrashEvent = {
+        type: 'crash',
+        id: '1234',
+        timestamp: Date.now(),
+        payload: {
+          error: new KafkaJSNonRetriableError('test'),
+          groupId, restart: true
+        }
+      };
+      handlers.forEach(h => h(crashEvent));
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      expect(event).toBeDefined();
+
+      mockConsumer.on = jest.fn();
     });
   });
 });
