@@ -1,56 +1,46 @@
 export function getOffsetHandlers() {
-  const offsetsWorking: Map<number, { offset: number; consumerGroupId?: string }[]> = new Map();
-  const offsetsFinished: Map<number, { offset: number; consumerGroupId?: string }[]> = new Map();
+  const offsetsWorking: Map<number, number[]> = new Map();
+  const offsetsFinished: Map<number, number[]> = new Map();
 
-  const startWorkingOffset = (partition: number, offset: number, consumerGroupId?: string) => {
+  const startWorkingOffset = (partition: number, offset: number) => {
     const offsets = offsetsWorking.get(partition) ?? [];
-    offsets.push({ offset, consumerGroupId });
+    offsets.push(offset);
     offsetsWorking.set(partition, offsets);
   };
   const finishWorkingOffset = (
     partition: number,
     offset: number,
-    consumerGroupId?: string,
-  ): { offset: number; consumerGroupIds: string[] } => {
+  ): number => {
     // sanity check that we have the partition, offset in our working
     if (!offsetsWorking.get(partition)) {
       return undefined;
     }
 
     const newOffsetsFinished = offsetsFinished.get(partition) ?? [];
-    newOffsetsFinished.push({ offset, consumerGroupId });
+    newOffsetsFinished.push(offset);
     offsetsFinished.set(partition, newOffsetsFinished);
 
     let newOffsetsWorking = offsetsWorking.get(partition);
-    const wasLowestOffsetWorking = offset <= Math.min(...newOffsetsWorking.map((o) => o.offset));
+    const wasLowestOffsetWorking = offset <= Math.min(...newOffsetsWorking);
 
-    newOffsetsWorking = newOffsetsWorking.filter((o) => o.offset != offset);
+    newOffsetsWorking = newOffsetsWorking.filter((o) => o != offset);
     offsetsWorking.set(partition, newOffsetsWorking);
 
     if (wasLowestOffsetWorking) {
-      const lowestOffsetWorking = Math.min(...newOffsetsWorking.map((o) => o.offset));
+      const lowestOffsetWorking = Math.min(...newOffsetsWorking);
       if (isFinite(lowestOffsetWorking)) {
         offsetsFinished.set(
           partition,
-          newOffsetsFinished.filter((o) => o.offset >= lowestOffsetWorking),
+          newOffsetsFinished.filter((o) => o >= lowestOffsetWorking),
         );
-        return {
-          offset: lowestOffsetWorking - 1,
-          consumerGroupIds: newOffsetsFinished
-            .filter((o) => o.offset < lowestOffsetWorking)
-            .map((o) => o.consumerGroupId)
-            .filter((o) => !!o),
-        };
+        return lowestOffsetWorking - 1;
       }
-      const highestOffsetFinished = Math.max(...newOffsetsFinished.map((o) => o.offset));
+      const highestOffsetFinished = Math.max(...newOffsetsFinished);
       if (isFinite(highestOffsetFinished)) {
         offsetsFinished.set(partition, []);
-        return {
-          offset: highestOffsetFinished,
-          consumerGroupIds: newOffsetsFinished.map((o) => o.consumerGroupId).filter((o) => !!o),
-        };
+        return highestOffsetFinished;
       }
-      return { offset, consumerGroupIds: [consumerGroupId].filter((o) => !!o) };
+      return offset;
     }
     return undefined;
   };

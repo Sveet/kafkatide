@@ -1,4 +1,4 @@
-import { getOffsetHandlers } from "./offsets";
+import { getOffsetHandlers } from './offsets';
 
 describe('getOffsetHandlers', () => {
   let startWorkingOffset;
@@ -31,9 +31,8 @@ describe('getOffsetHandlers', () => {
     const partition = 5;
     startWorkingOffset(partition, 1);
 
-    const dataToCommit = finishWorkingOffset(partition, 1);
-    expect(dataToCommit?.offset).toBe(1);
-    expect(dataToCommit?.consumerGroupIds).toStrictEqual([]);
+    const offsetToCommit = finishWorkingOffset(partition, 1);
+    expect(offsetToCommit).toBe(1);
   });
 
   it('should return the highest finished offset, but lower than the lowest currently working offset', () => {
@@ -54,11 +53,11 @@ describe('getOffsetHandlers', () => {
 
     expect(finishWorkingOffset(partition, 3)).toBe(undefined);
 
-    expect(finishWorkingOffset(partition, 0)?.offset).toBe(4);
+    expect(finishWorkingOffset(partition, 0)).toBe(4);
 
     expect(finishWorkingOffset(partition, 6)).toBe(undefined);
     expect(finishWorkingOffset(partition, 7)).toBe(undefined);
-    expect(finishWorkingOffset(partition, 5)?.offset).toBe(7);
+    expect(finishWorkingOffset(partition, 5)).toBe(7);
   });
 
   it('should return one less than the lowest current working offset', () => {
@@ -70,7 +69,7 @@ describe('getOffsetHandlers', () => {
 
     expect(finishWorkingOffset(partition, 510)).toBe(undefined);
     expect(finishWorkingOffset(partition, 520)).toBe(undefined);
-    expect(finishWorkingOffset(partition, 500)?.offset).toBe(529);
+    expect(finishWorkingOffset(partition, 500)).toBe(529);
   });
 
   it('should return one less than the lowest current working offset with mixed partitions', () => {
@@ -89,9 +88,9 @@ describe('getOffsetHandlers', () => {
     expect(finishWorkingOffset(partitionA, 510)).toBe(undefined);
     expect(finishWorkingOffset(partitionA, 520)).toBe(undefined);
     expect(finishWorkingOffset(partitionB, 510)).toBe(undefined);
-    expect(finishWorkingOffset(partitionA, 500)?.offset).toBe(529);
+    expect(finishWorkingOffset(partitionA, 500)).toBe(529);
 
     expect(finishWorkingOffset(partitionB, 520)).toBe(undefined);
-    expect(finishWorkingOffset(partitionB, 500)?.offset).toBe(529);
+    expect(finishWorkingOffset(partitionB, 500)).toBe(529);
   });
 });

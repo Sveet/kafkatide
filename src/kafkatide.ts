@@ -100,17 +100,17 @@ export default class KafkaTide {
 
             const workComplete = new Subject<void>();
             workComplete.subscribe(() => {
-              const dataToCommit = finishWorkingOffset(
+              const offsetToCommit = finishWorkingOffset(
                 partition,
                 Number.parseInt(message.offset),
               );
-              if (dataToCommit?.offset) {
+              if (offsetToCommit) {
                 try {
                   return consumer.commitOffsets([
                     {
                       topic,
                       partition,
-                      offset: `${dataToCommit.offset + 1}`,
+                      offset: `${offsetToCommit + 1}`,
                     },
                   ]);
                 } catch (err) {
