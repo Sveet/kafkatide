@@ -1,54 +1,74 @@
-# KafkaTide
-KafkaTide is a wrapper around the KafkaJS library to provide a reactive interface for producing and consuming Kafka messages.
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](code_of_conduct.md) 
 
-# Installation
+# KafkaTide
+
+KafkaTide is a lightweight wrapper around the KafkaJS library which provides a RxJS interface for producing and consuming Kafka messages.
+
+The goal of this project is to give the user full control of the asynchronous behavior of their code.
+
+The underlying KafkaJS configs are exposed for maximum control, while smart defaults are chosen to accommodate average use cases.
+
+## Installation
+
 ```bash
 npm install kafkatide
 ```
-# Usage
-## Producing messages
+    
+## Documentation
+
+[Documentation](documentation.md)
+
+
+## Usage/Examples
+
+### Initialize Kafka Connection
+The KafkaTide constructor is identical to KafkaJS constructor.
 ```typescript
-import KafkaTide from 'kafkatide';
+const { consume, produce } = new KafkaTide({
+  brokers: ['broker-1'],
+  clientId: 'kafkatide-example',
+})
+```
+### Consume Messages
 
-const { sendSubject, event$, error$, disconnectSubject } = new KafkaTide().produce('my-topic');
+```typescript
+const topic = 'com.kafkatide.example'
+const config = {
+  groupId: 'kafkatide'
+}
 
-sendSubject.next({ /* Kafka message */ });
+const { message$ } = consume({ topic, config })
 
-event$.subscribe(e => console.log(e)); // KafkaJS producer events
-error$.subscribe(e => console.log(e)); // KafkaJS producer errors
-disconnectSubject.next(); // Disconnect the producer
+message$.subscribe((m) => console.log(`received: ${m.value}`))
 ```
 
-## Consuming messages
+### Produce Messages
+
 ```typescript
-const { message$, event$ } = new KafkaTide().consume({ 
-  topic: 'my-topic', 
-  config: { groupId: 'my-group' } 
-});
+const { sendSubject, disconnectSubject } = produce(topic)
 
-message$.subscribe(m => {
-  // Use `m.workComplete` to signal that processing of the message is done.
-  // This will commit the offset.
-});
+sendSubject.next('Kafka has never been easier')
 
-event$.subscribe(e => console.log(e)); // KafkaJS consumer events
+disconnectSubject.next()
 ```
-# API
-## `KafkaTide(config)`
-Creates a new KafkaTide instance. Accepts an optional `kafkaConfig` for the underlying KafkaJS client.
 
-## `.produce(topic, producerConfig?)`
-Creates a producer for the given topic. Returns an object with:
+## Running Tests
+This repo adheres to a code coverage threshold of 90% (lines).
 
-* `sendSubject`: RxJS Subject to send messages
-* `event$`: Observable of KafkaJS producer events
-* `error$`: Observable of KafkaJS producer errors
-* `disconnectSubject`: RxJS Subject to disconnect the producer
+To run tests, run the following command.
 
-Accepts an optional `producerConfig` for the KafkaJS producer.
+```bash
+  npm run test
+```
 
-## `.consume({ config, topic, partition, offset })`
-Creates a consumer for the given `topic` and `config`. Optionally seeks to partition and offset. Returns an object with:
+## Contributing
 
-* `message$`: Observable of consumed Kafka messages
-* `event$`: Observable of KafkaJS consumer events
+Contributions are always welcome!
+
+See [contributing.md](contributing.md) for ways to get started.
+
+Please adhere to this project's [code of conduct](code_of_conduct.md).
+
+## Roadmap
+
+TBD
