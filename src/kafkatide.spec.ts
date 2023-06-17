@@ -226,6 +226,7 @@ describe('KafkaTide', () => {
 
     it('should call consumer.commitOffsets when appropriate', async () => {
       const consumeOptions = {
+        autoCommit: false,
         topic,
         config: {
           groupId,

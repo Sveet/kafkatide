@@ -7,6 +7,7 @@ export type ConsumeParams = {
   partition?: number;
   offset?: string;
   recoverOffsets?: boolean;
+  autoCommit?: boolean;
 };
 export type Message = {
   partition: number;

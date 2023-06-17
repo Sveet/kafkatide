@@ -118,7 +118,8 @@ export default class KafkaTide {
    *  - message$: Observable of consumed Kafka messages
    *  - event$: Observable of KafkaJS consumer events
    */
-  consume = ({ config, topic, partition, offset }: ConsumeParams) => {
+  consume = ({ autoCommit, config, topic, partition, offset }: ConsumeParams) => {
+    autoCommit ??= true
     const { startWorkingOffset, finishWorkingOffset } = getOffsetHandlers();
     const consumer = this.kafka.consumer(config);
     const run = async (subscriber: Subscriber<Message>) => {
@@ -126,35 +127,36 @@ export default class KafkaTide {
       await consumer.subscribe({ topic, fromBeginning: false });
 
       consumer.run({
-        autoCommit: false,
+        autoCommit,
         eachMessage: async ({ message, partition, heartbeat }) => {
           try {
             const headers = message.headers;
             const value = message.value.toString();
+            const workComplete = new Subject<void>();
 
             await heartbeat();
-            startWorkingOffset(partition, Number.parseInt(message.offset));
-
-            const workComplete = new Subject<void>();
-            workComplete.subscribe(() => {
-              const offsetToCommit = finishWorkingOffset(
-                partition,
-                Number.parseInt(message.offset),
-              );
-              if (offsetToCommit) {
-                try {
-                  return consumer.commitOffsets([
-                    {
-                      topic,
-                      partition,
-                      offset: `${offsetToCommit + 1}`,
-                    },
-                  ]);
-                } catch (err) {
-                  subscriber.error(err);
+            if(!autoCommit){
+              startWorkingOffset(partition, Number.parseInt(message.offset));
+              workComplete.subscribe(() => {
+                const offsetToCommit = finishWorkingOffset(
+                  partition,
+                  Number.parseInt(message.offset),
+                );
+                if (offsetToCommit) {
+                  try {
+                    return consumer.commitOffsets([
+                      {
+                        topic,
+                        partition,
+                        offset: `${offsetToCommit + 1}`,
+                      },
+                    ]);
+                  } catch (err) {
+                    subscriber.error(err);
+                  }
                 }
-              }
-            });
+              });
+            }
             subscriber.next({
               partition,
               offset: message.offset,
