@@ -1,2 +1,4 @@
-export * from './src/kafkatide'
-export * from './src/types'
+import KafkaTide from './src/kafkatide';
+
+export default KafkaTide;
+export * from './src/types';
