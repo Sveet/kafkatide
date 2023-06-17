@@ -83,7 +83,7 @@ export default class KafkaTide {
   }: ConsumeParams) => {
     const { startWorkingOffset, finishWorkingOffset } = getOffsetHandlers();
 
-    const consumer = this.getConsumer({ ...config, maxInFlightRequests: 20 });
+    const consumer = this.getConsumer(config);
     const run = async (subscriber: Subscriber<ConsumerMessageOutput>) => {
       await consumer.connect();
       await consumer.subscribe({ topic, fromBeginning: false });
