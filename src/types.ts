@@ -15,7 +15,7 @@ export type Message = {
   value: string;
   workComplete: Subject<void>;
 };
-export type Event= {
+export type Event = {
   type: string;
   payload?: InstrumentationEvent<any>;
-}
+};

@@ -7,7 +7,21 @@ import {
   RecordMetadata,
   logLevel,
 } from 'kafkajs';
-import { asyncScheduler, buffer, bufferTime, from, mergeWith, Observable, observeOn, scheduled, share, Subject, Subscriber, take, takeUntil } from 'rxjs';
+import {
+  asyncScheduler,
+  buffer,
+  bufferTime,
+  from,
+  mergeWith,
+  Observable,
+  observeOn,
+  scheduled,
+  share,
+  Subject,
+  Subscriber,
+  take,
+  takeUntil,
+} from 'rxjs';
 import { Event, Message, ConsumeParams } from './types';
 import { getOffsetHandlers } from './offsets';
 import { waitFor } from './operators';
@@ -21,7 +35,11 @@ export default class KafkaTide {
 
   produce = (topic: string, producerConfig?: ProducerConfig) => {
     let producer = this.kafka.producer(producerConfig);
-    const send = async (topic: string, messages: KafkaMessage[], retries = 1): Promise<RecordMetadata[]> => {
+    const send = async (
+      topic: string,
+      messages: KafkaMessage[],
+      retries = 1,
+    ): Promise<RecordMetadata[]> => {
       try {
         const response = await producer.send({
           topic: topic,
@@ -49,43 +67,36 @@ export default class KafkaTide {
     const errorSubject = new Subject<Error>();
     const error$ = errorSubject.asObservable();
     const event$ = new Observable<Event>((subscriber) => {
-      for(const event of Object.values(producer.events)){
-        producer.on(event, (e)=>{
+      for (const event of Object.values(producer.events)) {
+        producer.on(event, (e) => {
           subscriber.next({
             type: event,
-            payload: e
+            payload: e,
           });
         });
       }
     });
-    const buffered$ = send$.pipe(
-      buffer(connect$),
-      take(1),
-    );
-    scheduled(send$, asyncScheduler).pipe(
-      waitFor(connect$),
-      bufferTime(250),
-      mergeWith(buffered$),
-      takeUntil(disconnectSubject)
-    ).subscribe({
-      next: async (records) => {
-        if(records.length <= 0) return;
+    const buffered$ = send$.pipe(buffer(connect$), take(1));
+    scheduled(send$, asyncScheduler)
+      .pipe(waitFor(connect$), bufferTime(250), mergeWith(buffered$), takeUntil(disconnectSubject))
+      .subscribe({
+        next: async (records) => {
+          if (records.length <= 0) return;
 
-        return send(topic, records)
-          .catch(err => {
-            if(`${err}`.toLowerCase().includes('disconnected')){
+          return send(topic, records).catch((err) => {
+            if (`${err}`.toLowerCase().includes('disconnected')) {
               sendSubject.error(err);
             }
             errorSubject.next(err);
           });
-      },
-      error: () => {
-        producer.disconnect();
-      },
-      complete: () => {
-        producer.disconnect();
-      }
-    });
+        },
+        error: () => {
+          producer.disconnect();
+        },
+        complete: () => {
+          producer.disconnect();
+        },
+      });
     return { sendSubject, event$, error$, disconnectSubject };
   };
 
@@ -158,7 +169,9 @@ export default class KafkaTide {
         const eventString = `${typeof e.payload.error} ${e.payload.error} ${e.payload.error.stack}`;
         if (e.payload.restart) {
           // rebalancing sometimes runs out of internal retries and requires a consumer restart
-          console.error(`Consumer ${config.groupId} received a non-retriable error: ${eventString}`);
+          console.error(
+            `Consumer ${config.groupId} received a non-retriable error: ${eventString}`,
+          );
           return restartConsumer(subscriber);
         } else {
           console.warn(`KafkaJS retriable error for ${config.groupId}: ${eventString}`);
@@ -178,11 +191,11 @@ export default class KafkaTide {
       };
     }).pipe(observeOn(asyncScheduler));
     const event$ = new Observable<Event>((subscriber) => {
-      for(const event of Object.values(consumer.events)){
-        consumer.on(event, (e)=>{
+      for (const event of Object.values(consumer.events)) {
+        consumer.on(event, (e) => {
           subscriber.next({
             type: event,
-            payload: e
+            payload: e,
           });
         });
       }
