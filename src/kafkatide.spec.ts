@@ -16,6 +16,14 @@ const mockProducer = {
     .mockImplementation(async () => await new Promise((resolve) => setTimeout(resolve, 100))),
   disconnect: jest.fn().mockReturnValue(Promise.resolve()),
   send: jest.fn(),
+  on: jest.fn(),
+  events: {
+    CONNECT: 'producer.connect',
+    DISCONNECT: 'producer.disconnect',
+    REQUEST: 'producer.network.request',
+    REQUEST_TIMEOUT: 'producer.network.request_timeout',
+    REQUEST_QUEUE_SIZE: 'producer.network.request_queue_size',
+  }
 };
 const mockConsumer = {
   connect: jest
@@ -135,6 +143,23 @@ describe('KafkaTide', () => {
       disconnectSubject.next();
       expect(mockProducer.disconnect).toHaveBeenCalled();
     });
+
+    it('should emit events via event$', async () => {
+      const handlers = []
+      mockProducer.on = jest.fn().mockImplementation((name, handler) => {
+        handlers.push(handler);
+      });
+      let event;
+      const { event$, disconnectSubject } = tide.produce(topic);
+      event$.subscribe(e => event = e)
+      const payload = 'event payload'
+      handlers.forEach(h => h(payload))
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(event.payload).toBe(payload)
+      disconnectSubject.next()
+
+      mockProducer.on = jest.fn()
+    })
   });
 
   describe('consume', () => {
@@ -289,6 +314,25 @@ describe('KafkaTide', () => {
         },
       };
       handlers.forEach((h) => h(crashEvent));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      expect(mockConsumer.disconnect).toHaveBeenCalled();
+      expect(mockConsumer.run).toHaveBeenCalledTimes(2);
+
+      mockConsumer.on = jest.fn();
+    });
+
+    it('should restart the consumer when consumer.seek throws an error', async () => {
+      mockConsumer.seek.mockImplementationOnce(() => {throw new Error()})
+      const consumeOptions = {
+        topic,
+        partition: 0,
+        offset: '0',
+        config: {
+          groupId,
+        },
+      };
+      const { message$ } = tide.consume(consumeOptions);
+      message$.subscribe();
       await new Promise((resolve) => setTimeout(resolve, 1000));
       expect(mockConsumer.disconnect).toHaveBeenCalled();
       expect(mockConsumer.run).toHaveBeenCalledTimes(2);
