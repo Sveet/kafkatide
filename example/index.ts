@@ -19,13 +19,16 @@ message$.subscribe({
 
 setTimeout(()=> {
   // produce messages
-  const { sendSubject } = produce(topic)
+  const { sendSubject, disconnectSubject } = produce(topic)
   from(['sample 1', 'sample 2', 'sample 3']).subscribe({
     next: (m) => {
       console.log(`sending: ${m}`)
       sendSubject.next({ value: m })
     },
-    complete: () => console.log(`done producing`)
+    complete: () => {
+      console.log(`done producing`)
+      disconnectSubject.next()
+    }
   })
 }, 10000)
 
