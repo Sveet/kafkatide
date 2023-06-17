@@ -9,9 +9,10 @@ import {
   RecordMetadata,
   logLevel,
 } from 'kafkajs';
-import { asyncScheduler, buffer, concatMap, from, Observable, observeOn, Subject, Subscriber } from 'rxjs';
+import { asyncScheduler, buffer, bufferTime, concatMap, from, merge, mergeWith, Observable, observeOn, scheduled, share, Subject, Subscriber, take, takeUntil } from 'rxjs';
 import { EventOutput, ConsumerMessageOutput, ConsumeParams } from './types';
 import { getOffsetHandlers } from './offsets';
+import { waitFor } from '../operators';
 
 export default class KafkaTide {
   private kafka: Kafka;
@@ -43,9 +44,12 @@ export default class KafkaTide {
         }
       }
     };
-    const sendCompleteSubject = new Subject<void>();
-    const sendSubject = new Subject<ProducerRecord>();
+    const connect$ = from(producer.connect()).pipe(share());
+    const disconnectSubject = new Subject<void>();
+    const sendSubject = new Subject<Message[]>();
+    const send$ = sendSubject.asObservable().pipe(share());
     const errorSubject = new Subject<Error>();
+    const error$ = errorSubject.asObservable();
     const event$ = new Observable<EventOutput>((subscriber) => {
       for(const event of Object.values(producer.events)){
         producer.on(event, (e)=>{
@@ -56,20 +60,35 @@ export default class KafkaTide {
         });
       }
     });
-    from(producer.connect()).pipe(
-      concatMap(() => sendSubject),
-      buffer(sendCompleteSubject),
+    const buffered$ = send$.pipe(
+      buffer(connect$),
+      take(1),
+    );
+    scheduled(send$, asyncScheduler).pipe(
+      waitFor(connect$),
+      bufferTime(250),
+      mergeWith(buffered$),
+      takeUntil(disconnectSubject)
     ).subscribe({
-      next: (records) => {
-        if(records.length <= 0) return sendCompleteSubject.next();
+      next: async (records) => {
+        if(records.length <= 0) return;
 
-        return send(topic, records.reduce((acc, rec) => [...acc, ...rec.messages], []))
-          .then(() => sendCompleteSubject.next())
-          .catch(err => errorSubject.next(err));
+        return send(topic, records.reduce((acc, cur) => [...acc, ...cur], []))
+          .catch(err => {
+            if(`${err}`.toLowerCase().includes('disconnected')){
+              sendSubject.error(err);
+            }
+            errorSubject.next(err);
+          });
       },
+      error: () => {
+        producer.disconnect();
+      },
+      complete: () => {
+        producer.disconnect();
+      }
     });
-    const error$ = errorSubject.asObservable();
-    return { sendSubject, event$, error$ };
+    return { sendSubject, event$, error$, disconnectSubject };
   };
 
   consume = ({ config, topic, partition, offset }: ConsumeParams) => {
