@@ -1,4 +1,4 @@
-const config = {
+{
   "moduleFileExtensions": [
     "js",
     "json",
@@ -19,7 +19,5 @@ const config = {
     }
   },
   "coverageDirectory": "./coverage",
-  "testEnvironment": "node",
+  "testEnvironment": "node"
 }
-
-module.exports = config;

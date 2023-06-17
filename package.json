@@ -2,11 +2,13 @@
   "name": "kafkatide",
   "version": "0.0.1",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" ",
-    "lint.fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
+    "lint.fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "prepublish": "npx tsc"
   },
   "keywords": [],
   "author": "Joseph Fortman",
