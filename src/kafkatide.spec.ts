@@ -23,7 +23,7 @@ const mockProducer = {
     REQUEST: 'producer.network.request',
     REQUEST_TIMEOUT: 'producer.network.request_timeout',
     REQUEST_QUEUE_SIZE: 'producer.network.request_queue_size',
-  }
+  },
 };
 const mockConsumer = {
   connect: jest
@@ -145,21 +145,21 @@ describe('KafkaTide', () => {
     });
 
     it('should emit events via event$', async () => {
-      const handlers = []
+      const handlers = [];
       mockProducer.on = jest.fn().mockImplementation((name, handler) => {
         handlers.push(handler);
       });
       let event;
       const { event$, disconnectSubject } = tide.produce(topic);
-      event$.subscribe(e => event = e)
-      const payload = 'event payload'
-      handlers.forEach(h => h(payload))
+      event$.subscribe((e) => (event = e));
+      const payload = 'event payload';
+      handlers.forEach((h) => h(payload));
       await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(event.payload).toBe(payload)
-      disconnectSubject.next()
+      expect(event.payload).toBe(payload);
+      disconnectSubject.next();
 
-      mockProducer.on = jest.fn()
-    })
+      mockProducer.on = jest.fn();
+    });
   });
 
   describe('consume', () => {
@@ -322,7 +322,9 @@ describe('KafkaTide', () => {
     });
 
     it('should restart the consumer when consumer.seek throws an error', async () => {
-      mockConsumer.seek.mockImplementationOnce(() => {throw new Error()})
+      mockConsumer.seek.mockImplementationOnce(() => {
+        throw new Error();
+      });
       const consumeOptions = {
         topic,
         partition: 0,
