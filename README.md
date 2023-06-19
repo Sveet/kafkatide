@@ -88,7 +88,8 @@ Please adhere to this project's [code of conduct](code_of_conduct.md).
 
 ## Roadmap
 
-* [] Better support KafkaJS autoCommit functionality
-  * [] Potentially remove workComplete handler
-* [] Expose consumer.commitOffsets for manual offset handling
-* [] Use eachBatch instead of eachMessage
+* [ ] Investigate better support for KafkaJS autoCommit functionality
+  * [ ] Potentially remove workComplete handler
+* [ ] Expose consumer.commitOffsets for manual offset handling
+* [ ] Use eachBatch instead of eachMessage
+* [ ] Allow consuming to be throttled via RxJS
