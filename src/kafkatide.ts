@@ -114,11 +114,12 @@ export default class KafkaTide {
    * @param topic - Kafka topic to consume from
    * @param partition - Optional partition to consume from
    * @param offset - Optional offset to start consuming from
+   * @param runConfig - Optional config to pass to consumer.run
    * @returns Object containing:
    *  - message$: Observable of consumed Kafka messages
    *  - event$: Observable of KafkaJS consumer events
    */
-  consume = ({ runConfig, config, topic, partition, offset }: ConsumeParams) => {
+  consume = ({ config, topic, partition, offset, runConfig }: ConsumeParams) => {
     runConfig ??= {};
     runConfig.autoCommit ??= true;
     const { startWorkingOffset, finishWorkingOffset } = getOffsetHandlers();
@@ -194,8 +195,6 @@ export default class KafkaTide {
             `Consumer ${config.groupId} received a non-retriable error: ${eventString}`,
           );
           return restartConsumer(subscriber);
-        } else {
-          console.warn(`KafkaJS retriable error for ${config.groupId}: ${eventString}`);
         }
       });
       run(subscriber).catch((err) => {
