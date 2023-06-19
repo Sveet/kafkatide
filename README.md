@@ -29,6 +29,17 @@ const { consume, produce } = new KafkaTide({
   clientId: 'kafkatide-example',
 })
 ```
+
+### Produce Messages
+
+```typescript
+const { sendSubject, disconnectSubject } = produce(topic)
+
+sendSubject.next('Kafka has never been easier')
+
+disconnectSubject.next()
+```
+
 ### Consume Messages
 
 ```typescript
@@ -42,14 +53,20 @@ const { message$ } = consume({ topic, config })
 message$.subscribe((m) => console.log(`received: ${m.value}`))
 ```
 
-### Produce Messages
+### Committing Offsets
+Auto Commit is enabled by default. This will automatically commit the offset when the message has been read. See the [KafkaJS Docs](https://kafka.js.org/docs/consuming#a-name-auto-commit-a-autocommit) for more information.
+
+You may also handle commit offsets manually by setting `autoCommit: false` in the runConfig.
+
+Alternatively, messages expose a workComplete subject. Call `workComplete.next()` to trigger offsets to be committed.
 
 ```typescript
-const { sendSubject, disconnectSubject } = produce(topic)
+const { message$ } = consume({ topic, config })
 
-sendSubject.next('Kafka has never been easier')
-
-disconnectSubject.next()
+message$.subscribe(async ({value, workComplete}) => {
+  await saveValue(value)
+  workComplete.next()
+}))
 ```
 
 ## Running Tests
@@ -71,4 +88,7 @@ Please adhere to this project's [code of conduct](code_of_conduct.md).
 
 ## Roadmap
 
-TBD
+[] Better support KafkaJS autoCommit functionality
+  [] Potentially remove workComplete handler
+[] Expose consumer.commitOffsets for manual offset handling
+[] Use eachBatch instead of eachMessage
