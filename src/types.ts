@@ -14,7 +14,7 @@ export type Message = {
   offset: string;
   headers: IHeaders;
   value: string;
-  workComplete: Subject<void>;
+  workComplete: () => void;
 };
 export type Event = {
   type: string;

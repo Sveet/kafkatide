@@ -267,7 +267,7 @@ describe('KafkaTide', () => {
       const { message$ } = tide.consume(consumeOptions);
       message$.subscribe({
         next: (message) => {
-          message.workComplete.next();
+          message.workComplete();
         },
       });
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -287,7 +287,7 @@ describe('KafkaTide', () => {
       const { message$ } = tide.consume(consumeOptions);
       message$.subscribe({
         next: (message) => {
-          message.workComplete.next();
+          message.workComplete();
         },
         error: (err) => {
           expect(err.message).toBe(errorMessage);

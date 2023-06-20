@@ -141,7 +141,8 @@ export default class KafkaTide {
           commitOffsetsIfNecessary,
         }) => {
           const promises = batch.messages.map(async (m) => {
-            const workComplete = new Subject<void>();
+            const done$ = new Subject<void>();
+            const workComplete = () => done$.next();
             subscriber.next({
               partition: batch.partition,
               offset: m.offset,
@@ -153,7 +154,7 @@ export default class KafkaTide {
             if (!runConfig.autoCommit) {
               startWorkingOffset(batch.partition, Number.parseInt(m.offset));
             }
-            await firstValueFrom(workComplete);
+            await firstValueFrom(done$);
             if (!isRunning() || isStale()) return;
 
             if (runConfig.autoCommit) {
