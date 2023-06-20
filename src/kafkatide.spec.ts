@@ -163,18 +163,23 @@ describe('KafkaTide', () => {
   });
 
   describe('consume', () => {
+    const commitOffsetsIfNecessary = jest.fn();
     beforeEach(() => {
       jest.clearAllMocks();
-      mockConsumer.run.mockImplementationOnce(async ({ eachMessage }) => {
-        for (let i = 0; i < messages.length; i++) {
-          const m = messages[i];
-          await eachMessage({
-            message: { ...m, offset: i },
+      mockConsumer.run.mockImplementationOnce(async ({ eachBatch }) => {
+        await eachBatch({
+          batch: {
             partition: 1,
-            heartbeat: jest.fn(),
-          });
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
+            messages: messages.map((m, i) => {
+              return { ...m, offset: i };
+            }),
+          },
+          isRunning: jest.fn().mockReturnValue(true),
+          isStale: jest.fn().mockReturnValue(false),
+          resolveOffset: jest.fn(),
+          heartbeat: jest.fn(),
+          commitOffsetsIfNecessary,
+        });
       });
     });
     it('should request a consumer with options', () => {
@@ -249,7 +254,7 @@ describe('KafkaTide', () => {
       expect(mockConsumer.disconnect).toHaveBeenCalled();
     });
 
-    it('should call consumer.commitOffsets when appropriate', async () => {
+    it('should commit offsets when appropriate', async () => {
       const consumeOptions = {
         runConfig: {
           autoCommit: false,
@@ -266,7 +271,7 @@ describe('KafkaTide', () => {
         },
       });
       await new Promise((resolve) => setTimeout(resolve, 500));
-      expect(mockConsumer.commitOffsets).toHaveBeenCalled();
+      expect(commitOffsetsIfNecessary).toHaveBeenCalled();
     });
     it('should call subscriber.error if consumer.commitOffsets throws an error', async () => {
       const errorMessage = 'mocked error';

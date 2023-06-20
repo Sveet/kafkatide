@@ -8,7 +8,6 @@ export function getOffsetHandlers() {
     offsetsWorking.set(partition, offsets);
   };
   const finishWorkingOffset = (partition: number, offset: number): number => {
-    // sanity check that we have the partition, offset in our working
     if (!offsetsWorking.get(partition)) {
       return undefined;
     }

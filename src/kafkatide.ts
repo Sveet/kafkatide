@@ -11,6 +11,7 @@ import {
   asyncScheduler,
   buffer,
   bufferTime,
+  firstValueFrom,
   from,
   mergeWith,
   Observable,
@@ -130,44 +131,54 @@ export default class KafkaTide {
 
       consumer.run({
         ...runConfig,
-        eachMessage: async ({ message, partition, heartbeat }) => {
-          try {
-            const headers = message.headers;
-            const value = message.value.toString();
+        eachBatchAutoResolve: false,
+        eachBatch: async ({
+          batch,
+          isRunning,
+          isStale,
+          resolveOffset,
+          heartbeat,
+          commitOffsetsIfNecessary,
+        }) => {
+          const promises = batch.messages.map(async (m) => {
             const workComplete = new Subject<void>();
-
-            await heartbeat();
-            if (!runConfig.autoCommit) {
-              startWorkingOffset(partition, Number.parseInt(message.offset));
-              workComplete.subscribe(() => {
-                const offsetToCommit = finishWorkingOffset(
-                  partition,
-                  Number.parseInt(message.offset),
-                );
-                if (offsetToCommit) {
-                  try {
-                    return consumer.commitOffsets([
-                      {
-                        topic,
-                        partition,
-                        offset: `${offsetToCommit + 1}`,
-                      },
-                    ]);
-                  } catch (err) {
-                    subscriber.error(err);
-                  }
-                }
-              });
-            }
             subscriber.next({
-              partition,
-              offset: message.offset,
-              headers,
-              value,
+              partition: batch.partition,
+              offset: m.offset,
+              headers: m.headers,
+              value: m.value.toString(),
               workComplete,
             });
-          } catch (err) {
-            subscriber.error(err);
+            await heartbeat();
+            if (!runConfig.autoCommit) {
+              startWorkingOffset(batch.partition, Number.parseInt(m.offset));
+            }
+            await firstValueFrom(workComplete);
+            if (!isRunning() || isStale()) return;
+
+            if (runConfig.autoCommit) {
+              await commitOffsetsIfNecessary();
+            } else {
+              const offsetToCommit = finishWorkingOffset(
+                batch.partition,
+                Number.parseInt(m.offset),
+              );
+              if (offsetToCommit) {
+                await commitOffsetsIfNecessary({
+                  topics: [
+                    { topic, partitions: [{ partition: batch.partition, offset: m.offset }] },
+                  ],
+                });
+              }
+            }
+            resolveOffset(m.offset);
+          });
+          const results = await Promise.allSettled(promises);
+          const errors = results
+            .filter((r) => r.status == 'rejected')
+            .map((r) => (r as PromiseRejectedResult).reason);
+          if (errors?.length > 0) {
+            subscriber.error({ message: 'Error committing offsets', errors });
           }
         },
       });
