@@ -35,7 +35,7 @@ const { consume, produce } = new KafkaTide({
 
 ### Produce Messages
 
-Produce messages by supplying the topic. Optionally supply a KafkaJS ProducerConfig as a second parameter.
+Produce messages by supplying the topic. Optionally supply a KafkaJS ProducerConfig as a second parameter. See the [KafkaJS documentation](https://kafka.js.org/docs/producing) for more information.
 
 ```typescript
 const { sendSubject, disconnect } = kafkaTide.produce('my-topic');
@@ -51,7 +51,9 @@ disconnect();
 
 ### Consume Messages
 
-Consume messages by supplying KafkaJS consumer config and the topic. The consumer config minimally needs a groupId.
+Consume messages by supplying KafkaJS consumer config and the topic. The consumer config minimally needs a groupId. See the [KafkaJS Documentation](https://kafka.js.org/docs/consuming#a-name-options-a-options) for more information.
+
+See the [KafkaTide API docs](documentation.md#consumeparams) for all consume options.
 
 ```typescript
 const topic = 'com.kafkatide.example'
