@@ -18,8 +18,7 @@ npm install kafkatide
 ```
     
 ## Documentation
-
-[Documentation](documentation.md)
+[Full API Documenation for KafkaTide](documentation.md)
 
 
 ## Usage/Examples
