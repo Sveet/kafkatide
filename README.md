@@ -36,18 +36,12 @@ const { consume, produce } = new KafkaTide({
 ### Produce Messages
 
 ```typescript
-const { sendSubject, event$, error$, disconnect } = kafkaTide.produce('my-topic');
+const { sendSubject, disconnect } = kafkaTide.produce('my-topic');
 
 // Send a message
 sendSubject.next({
   value: 'Hello, world!',
 });
-
-// Handle events
-event$.subscribe(event => console.log(event));
-
-// Handle errors
-error$.subscribe(error => console.error(error));
 
 // Disconnect when done
 disconnect();
@@ -60,16 +54,13 @@ const topic = 'com.kafkatide.example'
 const config = {
   groupId: 'kafkatide'
 }
-const { message$, event$ } = kafkaTide.consume({ config, topic });
+const { message$} = kafkaTide.consume({ config, topic });
 
 // Handle incoming messages
 message$.subscribe({value, workComplete} => {
   console.log(value);
   workComplete();
 });
-
-// Handle events
-event$.subscribe(event => console.log(event));
 ```
 
 ### Advanced Usage
@@ -115,9 +106,6 @@ message$.subscribe({
     disconnect();
   }
 });
-
-// Disconnect when done
-disconnect();
 ```
 
 ### Committing Offsets
