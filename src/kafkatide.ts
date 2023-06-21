@@ -41,7 +41,7 @@ export default class KafkaTide {
    *  - sendSubject: RxJS Subject to send messages to Kafka
    *  - event$: Observable of KafkaJS producer events
    *  - error$: Observable of KafkaJS producer errors
-   *  - disconnectSubject: RxJS Subject to disconnect the producer
+   *  - disconnect: Call to disconnect the producer
    */
   produce = (topic: string, producerConfig?: ProducerConfig) => {
     let producer = this.kafka.producer(producerConfig);
@@ -72,6 +72,7 @@ export default class KafkaTide {
     };
     const connect$ = from(producer.connect()).pipe(share());
     const disconnectSubject = new Subject<void>();
+    const disconnect = () => disconnectSubject.next();
     const sendSubject = new Subject<KafkaMessage>();
     const send$ = sendSubject.asObservable().pipe(share());
     const errorSubject = new Subject<Error>();
@@ -107,7 +108,7 @@ export default class KafkaTide {
           producer.disconnect();
         },
       });
-    return { sendSubject, event$, error$, disconnectSubject };
+    return { sendSubject, event$, error$, disconnect };
   };
 
   /**
