@@ -60,10 +60,10 @@ const topic = 'com.kafkatide.example'
 const config = {
   groupId: 'kafkatide'
 }
-const { message$} = kafkaTide.consume({ config, topic });
+const { message$ } = kafkaTide.consume({ config, topic });
 
 // Handle incoming messages
-message$.subscribe({value, workComplete} => {
+message$.subscribe(({value, workComplete}) => {
   console.log(value);
   workComplete();
 });
@@ -92,26 +92,66 @@ const { message$ } = consume({ config, topic: 'input-topic' });
 const { sendSubject, disconnect } = produce('output-topic');
 
 // Handle incoming messages
-message$.subscribe({
-  next: (message) => {
-    console.log(`Received message: ${message.value}`);
+message$
+  .pipe(
+    // consume messages until the value is 'stop'
+    takeWhile(m => m.value != 'stop')
+  )
+  .subscribe({
+    next: (message) => {
+      console.log(`Received message: ${message.value}`);
 
-    // Modify the message
-    const modifiedMessage = modifyMessage(message.value);
+      // Modify the message
+      const modifiedMessage = modifyMessage(message.value);
 
-    // Send the modified message to 'output-topic'
-    sendSubject.next({
-      headers: message.headers,
-      value: modifiedMessage,
-    });
+      // Send the modified message to 'output-topic'
+      sendSubject.next({
+        headers: message.headers,
+        value: modifiedMessage,
+      });
 
-    // Mark the work as complete
-    message.workComplete();
-  },
-  complete: () => {
-    disconnect();
-  }
-});
+      // Mark the work as complete
+      message.workComplete();
+    },
+    complete: () => {
+      // disconnect the producer after consuming is complete
+      disconnect();
+    }
+  });
+```
+
+### Disconnecting the Consumer
+The consumer is automatically stopped and disconnected when the Observable's subscription has been ended. Each of the following examples results in a disconnected consumer.
+
+Unsubscribing from the subscription
+```typescript
+const subscription = message$.subscribe(m => console.log(m.value))
+
+// unsubscribe after 10 seconds
+setTimeout(() => subscription.unsubscribe(), 10000)
+```
+The subscription is completed
+```typescript
+message$
+  .pipe(
+    // take messages as long as the value is greater than 0
+    takeWhile(m => m.value > 0)
+  )
+  .subscribe({
+    next: m => console.log(m.value),
+    complete: () => console.log('complete')
+  })
+```
+The subscription encounters an error
+```typescript
+message$
+  .pipe(
+    throwError(new Error('Something went wrong!'))
+  ).subscribe({
+    next: m => console.log(m.value),
+    // Handle errors
+    error: err => console.error('Error occurred:', err)
+  })
 ```
 
 ### Committing Offsets

@@ -7,6 +7,7 @@
   "repository": {
     "url": "https://github.com/Sveet/kafkatide"
   },
+  "homepage": "https://github.com/Sveet/kafkatide#readme",
   "scripts": {
     "test": "jest",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" ",
