@@ -172,7 +172,10 @@ export default class KafkaTide {
               if (offsetToCommit) {
                 await commitOffsetsIfNecessary({
                   topics: [
-                    { topic, partitions: [{ partition: batch.partition, offset: m.offset }] },
+                    {
+                      topic,
+                      partitions: [{ partition: batch.partition, offset: `${offsetToCommit + 1}` }],
+                    },
                   ],
                 });
               }
