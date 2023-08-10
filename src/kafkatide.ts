@@ -180,6 +180,7 @@ export default class KafkaTide {
                 });
               }
             }
+            await heartbeat();
             resolveOffset(m.offset);
           });
           const results = await Promise.allSettled(promises);
