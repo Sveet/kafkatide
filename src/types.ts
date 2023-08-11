@@ -3,7 +3,8 @@ import { Subject } from 'rxjs';
 
 export type ConsumeParams = {
   config: ConsumerConfig;
-  topic: string;
+  topic?: string;
+  topics?: string[];
   partition?: number;
   offset?: string;
   recoverOffsets?: boolean;
