@@ -121,18 +121,22 @@ export default class KafkaTide {
    *  - message$: Observable of consumed Kafka messages
    *  - event$: Observable of KafkaJS consumer events
    */
-  consume = ({ config, topic, partition, offset, runConfig }: ConsumeParams) => {
+  consume = ({ config, topic, topics, partition, offset, runConfig }: ConsumeParams) => {
     config.allowAutoTopicCreation ??= false;
     config.maxBytes ??= 2048; // 2KB
 
     runConfig ??= {};
     runConfig.autoCommit ??= true;
 
+    if (topic && topics) {
+      topics = undefined;
+    }
+
     const { startWorkingOffset, finishWorkingOffset } = getOffsetHandlers();
     const consumer = this.kafka.consumer(config);
     const run = async (subscriber: Subscriber<Message>) => {
       await consumer.connect();
-      await consumer.subscribe({ topic, fromBeginning: false });
+      await consumer.subscribe({ topic, topics, fromBeginning: false });
 
       consumer.run({
         ...runConfig,
