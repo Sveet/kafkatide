@@ -13,6 +13,8 @@ import {
   bufferTime,
   firstValueFrom,
   from,
+  interval,
+  mergeMap,
   mergeWith,
   Observable,
   observeOn,
@@ -149,51 +151,61 @@ export default class KafkaTide {
           heartbeat,
           commitOffsetsIfNecessary,
         }) => {
-          const promises = batch.messages.map(async (m) => {
-            const done$ = new Subject<void>();
-            const workComplete = () => done$.next();
-            subscriber.next({
-              partition: batch.partition,
-              offset: m.offset,
-              headers: m.headers,
-              value: m.value.toString(),
-              workComplete,
-            });
-            await heartbeat();
-            if (!runConfig.autoCommit) {
-              startWorkingOffset(batch.partition, Number.parseInt(m.offset));
-            }
-            await firstValueFrom(done$);
-            if (!isRunning() || isStale()) return;
+          await new Promise<void>((resolve) => {
+            const completeSubject = new Subject<void>();
+            interval(500).pipe(mergeMap(heartbeat), takeUntil(completeSubject));
 
-            if (runConfig.autoCommit) {
-              await commitOffsetsIfNecessary();
-            } else {
-              const offsetToCommit = finishWorkingOffset(
-                batch.partition,
-                Number.parseInt(m.offset),
-              );
-              if (offsetToCommit) {
-                await commitOffsetsIfNecessary({
-                  topics: [
-                    {
-                      topic,
-                      partitions: [{ partition: batch.partition, offset: `${offsetToCommit + 1}` }],
-                    },
-                  ],
-                });
-              }
-            }
-            await heartbeat();
-            resolveOffset(m.offset);
+            from(batch.messages)
+              .pipe(
+                mergeMap(async (m) => {
+                  const done$ = new Subject<void>();
+                  const workComplete = () => done$.next();
+                  subscriber.next({
+                    partition: batch.partition,
+                    offset: m.offset,
+                    headers: m.headers,
+                    value: m.value.toString(),
+                    workComplete,
+                  });
+                  if (!runConfig.autoCommit) {
+                    startWorkingOffset(batch.partition, Number.parseInt(m.offset));
+                  }
+                  await firstValueFrom(done$);
+                  if (!isRunning() || isStale()) return;
+
+                  if (runConfig.autoCommit) {
+                    await commitOffsetsIfNecessary();
+                  } else {
+                    const offsetToCommit = finishWorkingOffset(
+                      batch.partition,
+                      Number.parseInt(m.offset),
+                    );
+                    if (offsetToCommit) {
+                      await commitOffsetsIfNecessary({
+                        topics: [
+                          {
+                            topic,
+                            partitions: [
+                              { partition: batch.partition, offset: `${offsetToCommit + 1}` },
+                            ],
+                          },
+                        ],
+                      });
+                    }
+                  }
+                  resolveOffset(m.offset);
+                }),
+              )
+              .subscribe({
+                error: (err) => {
+                  subscriber.error({ message: 'Error committing offsets', error: err });
+                },
+                complete: () => {
+                  completeSubject.next();
+                  resolve();
+                },
+              });
           });
-          const results = await Promise.allSettled(promises);
-          const errors = results
-            .filter((r) => r.status == 'rejected')
-            .map((r) => (r as PromiseRejectedResult).reason);
-          if (errors?.length > 0) {
-            subscriber.error({ message: 'Error committing offsets', errors });
-          }
         },
       });
 
