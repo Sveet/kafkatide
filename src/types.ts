@@ -11,6 +11,7 @@ export type ConsumeParams = {
   runConfig?: RunConfig;
 };
 export type Message = {
+  key: string;
   partition: number;
   offset: string;
   headers: IHeaders;

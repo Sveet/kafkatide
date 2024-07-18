@@ -161,6 +161,7 @@ export default class KafkaTide {
                   const done$ = new Subject<void>();
                   const workComplete = () => done$.next();
                   subscriber.next({
+                    key: m.key.toString(),
                     partition: batch.partition,
                     offset: m.offset,
                     headers: m.headers,
